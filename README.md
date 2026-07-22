@@ -1,98 +1,99 @@
-# vinext-starter
+# Calorie Counter Dashboard
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+A self-hosted calorie dashboard for tracking foods, meal logs, weight-loss goals,
+and calorie targets. The app supports local user profiles, Google Sheet CSV
+imports, USDA FoodData Central lookup, and dynamic weight projections.
 
-## Prerequisites
+## Production Stack
 
-- Node.js `>=22.13.0`
+- Next.js app server
+- PostgreSQL database
+- Docker Compose for app + database
+- PowerShell scripts for Windows deployment and backups
 
-## Quick Start
+Browser storage is still used as a fallback. When `DATABASE_URL` is configured,
+the app loads and saves dashboard state through PostgreSQL.
+
+## Local Development
+
+```powershell
+pnpm install
+pnpm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Docker Deployment
+
+Prerequisites on the server:
+
+- Docker Desktop or Docker Engine
+- Docker Compose v2
+- PowerShell 7 or Windows PowerShell
+
+First deployment:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+.\scripts\deploy.ps1
+```
+
+Change `POSTGRES_PASSWORD` in `.env` before running `deploy.ps1`. The app will
+build, start PostgreSQL, run migrations, and expose the dashboard on
+`APP_PORT`.
+
+Redeploy after code changes:
+
+```powershell
+.\scripts\deploy.ps1
+```
+
+Restart without rebuilding:
+
+```powershell
+.\scripts\deploy.ps1 -NoBuild
+```
+
+## Database
+
+Migrations live in `db/migrations/`. The production container runs:
 
 ```bash
-npm install
-npm run dev
-npm run build
+node scripts/migrate.mjs
 ```
 
-This starter does not use `wrangler.jsonc`.
+before starting the app server.
 
-## Included Shape
+Main tables:
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+- `user_profiles`: body, goal, activity, HRT, and planned-intake settings
+- `foods`: shared food library
+- `log_entries`: meal logs separated by active profile
+- `app_settings`: active profile and USDA API key
 
-## Workspace Auth Headers
+## Backups
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+Create a PostgreSQL backup:
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```powershell
+.\scripts\backup-db.ps1
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+Backups are written to `backups/`.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+Restore a backup:
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+```powershell
+.\scripts\restore-db.ps1 -Path .\backups\calories-dashboard-YYYYMMDD-HHMMSS.sql
+```
 
 ## Useful Commands
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+```powershell
+pnpm run build
+pnpm test
+pnpm run db:migrate
+docker compose logs -f app
+docker compose ps
+```

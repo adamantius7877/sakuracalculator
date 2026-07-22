@@ -1,55 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
-type Sex = "male" | "female" | "transFemale" | "transMale";
-type ActivityKey =
-  | "sedentary"
-  | "light"
-  | "moderate"
-  | "active"
-  | "very-active";
-
-type Profile = {
-  sex: Sex;
-  age: number;
-  heightIn: number;
-  weightLb: number;
-  bodyFat: number;
-  hrtYears: number;
-  activity: ActivityKey;
-  goalWeightLb: number;
-  goalWeeks: number;
-  plannedDailyCalories: number;
-};
-
-type UserProfile = {
-  id: string;
-  name: string;
-  profile: Profile;
-};
-
-type Food = {
-  id: string;
-  name: string;
-  source: string;
-  serving: string;
-  calories: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-};
-
-type LogEntry = {
-  id: string;
-  profileId: string;
-  foodId?: string;
-  name: string;
-  serving: string;
-  quantity: number;
-  calories: number;
-  date: string;
-};
+import type {
+  ActivityKey,
+  DashboardState,
+  Food,
+  LogEntry,
+  Profile,
+  Sex,
+  UserProfile,
+} from "@/lib/types";
 
 type FdcFood = {
   fdcId: number;
@@ -102,6 +62,43 @@ function createUserProfile(name = "Me", profile: Profile = defaultProfile): User
     id: uid("p"),
     name,
     profile: { ...defaultProfile, ...profile },
+  };
+}
+
+function buildDefaultState(): DashboardState {
+  const firstProfile = createUserProfile("Me");
+  return {
+    profiles: [firstProfile],
+    activeProfileId: firstProfile.id,
+    foods: starterFoods,
+    log: [],
+    fdcKey: "",
+  };
+}
+
+function normalizeDashboardState(saved: Partial<DashboardState> & { profile?: Profile }): DashboardState {
+  const fallback = buildDefaultState();
+  const profiles = saved.profiles?.length
+    ? saved.profiles.map((item) => ({
+        id: item.id || uid("p"),
+        name: item.name || "Profile",
+        profile: { ...defaultProfile, ...item.profile },
+      }))
+    : [createUserProfile("Me", { ...defaultProfile, ...saved.profile })];
+  const activeProfileId = profiles.some((item) => item.id === saved.activeProfileId)
+    ? saved.activeProfileId ?? profiles[0].id
+    : profiles[0].id;
+  const log = (saved.log ?? []).map((entry) => ({
+    ...entry,
+    profileId: entry.profileId || activeProfileId,
+  }));
+
+  return {
+    profiles,
+    activeProfileId,
+    foods: saved.foods?.length ? saved.foods : fallback.foods,
+    log,
+    fdcKey: saved.fdcKey ?? "",
   };
 }
 
@@ -469,54 +466,89 @@ export default function Home() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      setActiveProfileId((current) => current || profiles[0].id);
-      setIsHydrated(true);
-      return;
-    }
+    let isCancelled = false;
 
-    try {
-      const saved = JSON.parse(raw);
-      const savedProfiles: UserProfile[] = saved.profiles?.length
-        ? saved.profiles.map((item: UserProfile) => ({
-            id: item.id || uid("p"),
-            name: item.name || "Profile",
-            profile: { ...defaultProfile, ...item.profile },
-          }))
-        : [createUserProfile("Me", { ...defaultProfile, ...saved.profile })];
-      const selectedId = savedProfiles.some(
-        (item) => item.id === saved.activeProfileId,
-      )
-        ? saved.activeProfileId
-        : savedProfiles[0].id;
-
-      setProfiles(savedProfiles);
-      setActiveProfileId(selectedId);
+    function applyState(nextState: DashboardState) {
+      setProfiles(nextState.profiles);
+      setActiveProfileId(nextState.activeProfileId);
       setProfileName(
-        savedProfiles.find((item) => item.id === selectedId)?.name ?? "Me",
+        nextState.profiles.find((item) => item.id === nextState.activeProfileId)
+          ?.name ?? nextState.profiles[0].name,
       );
-      setFoods(saved.foods?.length ? saved.foods : starterFoods);
-      setLog(
-        (saved.log ?? []).map((entry: LogEntry) => ({
-          ...entry,
-          profileId: entry.profileId || selectedId,
-        })),
-      );
-      setFdcKey(saved.fdcKey ?? "");
-    } catch {
-      setStatus("Saved dashboard data could not be loaded.");
-    } finally {
-      setIsHydrated(true);
+      setFoods(nextState.foods);
+      setLog(nextState.log);
+      setFdcKey(nextState.fdcKey);
     }
+
+    async function loadState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const localState = raw
+        ? normalizeDashboardState(JSON.parse(raw))
+        : buildDefaultState();
+
+      try {
+        const response = await fetch("/api/state");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.configured && data.hasData && data.state) {
+            if (!isCancelled) applyState(normalizeDashboardState(data.state));
+            return;
+          }
+
+          if (data.configured && raw && !isCancelled) {
+            setStatus("Loaded local data. It will sync to PostgreSQL.");
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setStatus("Database unavailable. Using browser storage.");
+        }
+      }
+
+      if (!isCancelled) applyState(localState);
+    }
+
+    loadState()
+      .catch(() => {
+        if (!isCancelled) {
+          applyState(buildDefaultState());
+          setStatus("Saved dashboard data could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setIsHydrated(true);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (!isHydrated || !activeProfileId) return;
+    const state: DashboardState = {
+      profiles,
+      activeProfileId,
+      foods,
+      log,
+      fdcKey,
+    };
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ profiles, activeProfileId, foods, log, fdcKey }),
+      JSON.stringify(state),
     );
+
+    const saveTimer = window.setTimeout(() => {
+      fetch("/api/state", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(state),
+      }).catch(() => {
+        // Browser storage remains the offline fallback when the API is unavailable.
+      });
+    }, 350);
+
+    return () => window.clearTimeout(saveTimer);
   }, [activeProfileId, fdcKey, foods, isHydrated, log, profiles]);
 
   const activeUserProfile =

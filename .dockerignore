@@ -1,0 +1,12 @@
+.git
+.next
+.openai
+.pnpm-store
+.wrangler
+dist
+node_modules
+backups
+*.log
+.env
+.env.local
+.env.*.local
