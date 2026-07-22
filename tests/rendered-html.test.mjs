@@ -30,6 +30,8 @@ test("server-renders the calorie dashboard", async () => {
   const html = await response.text();
   assert.match(html, /<title>Calorie Counter Dashboard<\/title>/i);
   assert.match(html, /Track meals and calculate a realistic weight-loss target/);
+  assert.match(html, /User Profiles/);
+  assert.match(html, /Active profile/);
   assert.match(html, /Body Profile/);
   assert.match(html, /Food Library/);
   assert.match(html, /USDA Food Lookup/);

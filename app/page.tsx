@@ -23,6 +23,12 @@ type Profile = {
   plannedDailyCalories: number;
 };
 
+type UserProfile = {
+  id: string;
+  name: string;
+  profile: Profile;
+};
+
 type Food = {
   id: string;
   name: string;
@@ -36,6 +42,7 @@ type Food = {
 
 type LogEntry = {
   id: string;
+  profileId: string;
   foodId?: string;
   name: string;
   serving: string;
@@ -89,6 +96,14 @@ const defaultProfile: Profile = {
   goalWeeks: 24,
   plannedDailyCalories: 1800,
 };
+
+function createUserProfile(name = "Me", profile: Profile = defaultProfile): UserProfile {
+  return {
+    id: uid("p"),
+    name,
+    profile: { ...defaultProfile, ...profile },
+  };
+}
 
 const starterFoods: Food[] = [
   {
@@ -428,7 +443,11 @@ function nutrient(food: FdcFood, name: string) {
 }
 
 export default function Home() {
-  const [profile, setProfile] = useState<Profile>(defaultProfile);
+  const [profiles, setProfiles] = useState<UserProfile[]>(() => [
+    createUserProfile("Me"),
+  ]);
+  const [activeProfileId, setActiveProfileId] = useState("");
+  const [profileName, setProfileName] = useState("Me");
   const [foods, setFoods] = useState<Food[]>(starterFoods);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [selectedFoodId, setSelectedFoodId] = useState(starterFoods[0].id);
@@ -447,32 +466,70 @@ export default function Home() {
   const [fdcQuery, setFdcQuery] = useState("");
   const [fdcResults, setFdcResults] = useState<FdcFood[]>([]);
   const [status, setStatus] = useState("");
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      setActiveProfileId((current) => current || profiles[0].id);
+      setIsHydrated(true);
+      return;
+    }
 
     try {
       const saved = JSON.parse(raw);
-      setProfile({ ...defaultProfile, ...saved.profile });
+      const savedProfiles: UserProfile[] = saved.profiles?.length
+        ? saved.profiles.map((item: UserProfile) => ({
+            id: item.id || uid("p"),
+            name: item.name || "Profile",
+            profile: { ...defaultProfile, ...item.profile },
+          }))
+        : [createUserProfile("Me", { ...defaultProfile, ...saved.profile })];
+      const selectedId = savedProfiles.some(
+        (item) => item.id === saved.activeProfileId,
+      )
+        ? saved.activeProfileId
+        : savedProfiles[0].id;
+
+      setProfiles(savedProfiles);
+      setActiveProfileId(selectedId);
+      setProfileName(
+        savedProfiles.find((item) => item.id === selectedId)?.name ?? "Me",
+      );
       setFoods(saved.foods?.length ? saved.foods : starterFoods);
-      setLog(saved.log ?? []);
+      setLog(
+        (saved.log ?? []).map((entry: LogEntry) => ({
+          ...entry,
+          profileId: entry.profileId || selectedId,
+        })),
+      );
       setFdcKey(saved.fdcKey ?? "");
     } catch {
       setStatus("Saved dashboard data could not be loaded.");
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!isHydrated || !activeProfileId) return;
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ profile, foods, log, fdcKey }),
+      JSON.stringify({ profiles, activeProfileId, foods, log, fdcKey }),
     );
-  }, [profile, foods, log, fdcKey]);
+  }, [activeProfileId, fdcKey, foods, isHydrated, log, profiles]);
+
+  const activeUserProfile =
+    profiles.find((item) => item.id === activeProfileId) ?? profiles[0];
+  const profile = activeUserProfile.profile;
+  const profileLog = log.filter((entry) => entry.profileId === activeUserProfile.id);
 
   const selectedFood = foods.find((food) => food.id === selectedFoodId) ?? foods[0];
   const todayTotal = log
-    .filter((entry) => entry.date === entryDate)
+    .filter(
+      (entry) =>
+        entry.date === entryDate && entry.profileId === activeUserProfile.id,
+    )
     .reduce((sum, entry) => sum + entry.calories * entry.quantity, 0);
 
   const calculator = useMemo(() => {
@@ -513,7 +570,60 @@ export default function Home() {
   );
 
   function updateProfile<K extends keyof Profile>(key: K, value: Profile[K]) {
-    setProfile((current) => ({ ...current, [key]: value }));
+    setProfiles((current) =>
+      current.map((item) =>
+        item.id === activeUserProfile.id
+          ? { ...item, profile: { ...item.profile, [key]: value } }
+          : item,
+      ),
+    );
+  }
+
+  function switchProfile(profileId: string) {
+    const nextProfile = profiles.find((item) => item.id === profileId);
+    if (!nextProfile) return;
+    setActiveProfileId(profileId);
+    setProfileName(nextProfile.name);
+    setStatus(`Switched to ${nextProfile.name}.`);
+  }
+
+  function createProfile() {
+    const name = profileName.trim() || `Profile ${profiles.length + 1}`;
+    const newProfile = createUserProfile(name, profile);
+    setProfiles((current) => [...current, newProfile]);
+    setActiveProfileId(newProfile.id);
+    setProfileName(newProfile.name);
+    setStatus(`${newProfile.name} was created.`);
+  }
+
+  function renameActiveProfile() {
+    const name = profileName.trim();
+    if (!name) return;
+    setProfiles((current) =>
+      current.map((item) =>
+        item.id === activeUserProfile.id ? { ...item, name } : item,
+      ),
+    );
+    setStatus(`Renamed profile to ${name}.`);
+  }
+
+  function deleteActiveProfile() {
+    if (profiles.length <= 1) {
+      setStatus("Keep at least one profile.");
+      return;
+    }
+
+    const remainingProfiles = profiles.filter(
+      (item) => item.id !== activeUserProfile.id,
+    );
+    const nextProfile = remainingProfiles[0];
+    setProfiles(remainingProfiles);
+    setLog((current) =>
+      current.filter((entry) => entry.profileId !== activeUserProfile.id),
+    );
+    setActiveProfileId(nextProfile.id);
+    setProfileName(nextProfile.name);
+    setStatus(`${activeUserProfile.name} was removed.`);
   }
 
   function addManualFood(event: FormEvent) {
@@ -540,6 +650,7 @@ export default function Home() {
     setLog((current) => [
       {
         id: uid("l"),
+        profileId: activeUserProfile.id,
         foodId: selectedFood.id,
         name: selectedFood.name,
         serving: selectedFood.serving,
@@ -663,6 +774,47 @@ export default function Home() {
 
       <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-8">
         <aside className="space-y-5">
+          <Panel title="User Profiles">
+            <div className="space-y-3">
+              <label className="field">
+                <span>Active profile</span>
+                <select
+                  value={activeUserProfile.id}
+                  onChange={(event) => switchProfile(event.target.value)}
+                >
+                  {profiles.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Profile name</span>
+                <input
+                  value={profileName}
+                  onChange={(event) => setProfileName(event.target.value)}
+                  placeholder="Me"
+                />
+              </label>
+              <div className="profile-actions">
+                <button className="secondary" type="button" onClick={renameActiveProfile}>
+                  Rename
+                </button>
+                <button className="secondary" type="button" onClick={createProfile}>
+                  Add profile
+                </button>
+                <button className="danger" type="button" onClick={deleteActiveProfile}>
+                  Delete
+                </button>
+              </div>
+              <p className="text-sm leading-6 text-[#8a5b6f]">
+                Body, goal, and intake settings follow the selected profile. Foods stay shared,
+                while meal logs are kept separate per profile.
+              </p>
+            </div>
+          </Panel>
+
           <Panel title="Body Profile">
             <div className="grid grid-cols-2 gap-3">
               <label className="field">
@@ -971,10 +1123,10 @@ export default function Home() {
 
           <Panel title="Recent Entries">
             <div className="entry-list">
-              {log.length === 0 ? (
+              {profileLog.length === 0 ? (
                 <p className="text-sm text-[#66705e]">No meals logged yet.</p>
               ) : (
-                log.slice(0, 10).map((entry) => (
+                profileLog.slice(0, 10).map((entry) => (
                   <div key={entry.id} className="entry">
                     <span>
                       <strong>{entry.name}</strong>

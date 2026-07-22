@@ -217,7 +217,8 @@ textarea {
 }
 
 .primary,
-.secondary {
+.secondary,
+.danger {
   min-height: 2.55rem;
   border-radius: 6px;
   padding: 0.65rem 0.95rem;
@@ -240,9 +241,22 @@ textarea {
   color: var(--sakura-ink);
 }
 
+.danger {
+  border: 1px solid #ecb3bc;
+  background: #fff4f5;
+  color: #9f3d49;
+}
+
 .primary:hover,
-.secondary:hover {
+.secondary:hover,
+.danger:hover {
   transform: translateY(-1px);
+}
+
+.profile-actions {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .projection {
