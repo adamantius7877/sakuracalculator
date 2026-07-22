@@ -14,6 +14,9 @@ imports, USDA FoodData Central lookup, and dynamic weight projections.
 Browser storage is still used as a fallback. When `DATABASE_URL` is configured,
 the app loads and saves dashboard state through PostgreSQL.
 
+Secrets such as `POSTGRES_PASSWORD`, `DATABASE_URL`, and `FDC_API_KEY` belong in
+your private `.env` file or server environment. Do not commit `.env`.
+
 ## Local Development
 
 ```powershell
@@ -43,6 +46,9 @@ Change `POSTGRES_PASSWORD` in `.env` before running `deploy.ps1`. The app will
 build, start PostgreSQL, run migrations, and expose the dashboard on
 `APP_PORT`.
 
+To enable USDA FoodData Central search, set `FDC_API_KEY` in `.env`. The key is
+used server-side only and is not stored in browser state or PostgreSQL.
+
 Redeploy after code changes:
 
 ```powershell
@@ -70,7 +76,7 @@ Main tables:
 - `user_profiles`: body, goal, activity, HRT, and planned-intake settings
 - `foods`: shared food library
 - `log_entries`: meal logs separated by active profile
-- `app_settings`: active profile and USDA API key
+- `app_settings`: active profile
 
 ## Backups
 

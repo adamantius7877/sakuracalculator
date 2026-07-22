@@ -29,6 +29,7 @@ test("postgres persistence API and docker deployment files are present", async (
   assert.match(route, /DATABASE_URL/);
   assert.match(route, /user_profiles/);
   assert.match(route, /log_entries/);
+  assert.doesNotMatch(route, /fdc_api_key/);
   assert.match(migration, /create table if not exists user_profiles/);
   assert.match(migration, /create table if not exists foods/);
   assert.match(compose, /postgres:16-alpine/);

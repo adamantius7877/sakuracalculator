@@ -53,5 +53,4 @@ export type DashboardState = {
   activeProfileId: string;
   foods: Food[];
   log: LogEntry[];
-  fdcKey: string;
 };

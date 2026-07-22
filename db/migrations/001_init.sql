@@ -1,7 +1,6 @@
 create table if not exists app_settings (
   id integer primary key check (id = 1),
   active_profile_id text,
-  fdc_api_key text not null default '',
   updated_at timestamptz not null default now()
 );
 

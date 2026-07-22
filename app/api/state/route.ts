@@ -24,7 +24,7 @@ async function readState(): Promise<DashboardState | null> {
   try {
     const [settingsResult, profilesResult, foodsResult, logsResult] =
       await Promise.all([
-        client.query("select active_profile_id, fdc_api_key from app_settings where id = 1"),
+        client.query("select active_profile_id from app_settings where id = 1"),
         client.query(
           "select id, name, profile from user_profiles order by created_at, name",
         ),
@@ -76,7 +76,6 @@ async function readState(): Promise<DashboardState | null> {
             ? row.entry_date.toISOString().slice(0, 10)
             : String(row.entry_date),
       })),
-      fdcKey: settingsResult.rows[0]?.fdc_api_key ?? "",
     };
   } finally {
     client.release();
@@ -183,13 +182,12 @@ export async function PUT(request: Request) {
       }
 
       await client.query(
-        `insert into app_settings (id, active_profile_id, fdc_api_key, updated_at)
-         values (1, $1, $2, now())
+        `insert into app_settings (id, active_profile_id, updated_at)
+         values (1, $1, now())
          on conflict (id)
          do update set active_profile_id = excluded.active_profile_id,
-                       fdc_api_key = excluded.fdc_api_key,
                        updated_at = now()`,
-        [activeProfileId, payload.fdcKey ?? ""],
+        [activeProfileId],
       );
       await client.query("commit");
     } catch (error) {

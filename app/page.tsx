@@ -72,7 +72,6 @@ function buildDefaultState(): DashboardState {
     activeProfileId: firstProfile.id,
     foods: starterFoods,
     log: [],
-    fdcKey: "",
   };
 }
 
@@ -98,7 +97,6 @@ function normalizeDashboardState(saved: Partial<DashboardState> & { profile?: Pr
     activeProfileId,
     foods: saved.foods?.length ? saved.foods : fallback.foods,
     log,
-    fdcKey: saved.fdcKey ?? "",
   };
 }
 
@@ -459,7 +457,6 @@ export default function Home() {
   });
   const [csvText, setCsvText] = useState("");
   const [csvUrl, setCsvUrl] = useState("");
-  const [fdcKey, setFdcKey] = useState("");
   const [fdcQuery, setFdcQuery] = useState("");
   const [fdcResults, setFdcResults] = useState<FdcFood[]>([]);
   const [status, setStatus] = useState("");
@@ -477,7 +474,6 @@ export default function Home() {
       );
       setFoods(nextState.foods);
       setLog(nextState.log);
-      setFdcKey(nextState.fdcKey);
     }
 
     async function loadState() {
@@ -531,7 +527,6 @@ export default function Home() {
       activeProfileId,
       foods,
       log,
-      fdcKey,
     };
     localStorage.setItem(
       STORAGE_KEY,
@@ -549,7 +544,7 @@ export default function Home() {
     }, 350);
 
     return () => window.clearTimeout(saveTimer);
-  }, [activeProfileId, fdcKey, foods, isHydrated, log, profiles]);
+  }, [activeProfileId, foods, isHydrated, log, profiles]);
 
   const activeUserProfile =
     profiles.find((item) => item.id === activeProfileId) ?? profiles[0];
@@ -717,17 +712,14 @@ export default function Home() {
   }
 
   async function searchFdc() {
-    if (!fdcKey || !fdcQuery) {
-      setStatus("Enter a USDA FoodData Central API key and search term first.");
+    if (!fdcQuery) {
+      setStatus("Enter a USDA FoodData Central search term first.");
       return;
     }
 
     setStatus("Searching USDA FoodData Central...");
-    const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
-    url.searchParams.set("api_key", fdcKey);
+    const url = new URL("/api/usda/search", window.location.origin);
     url.searchParams.set("query", fdcQuery);
-    url.searchParams.set("pageSize", "8");
-    url.searchParams.set("dataType", "Foundation,SR Legacy,Survey (FNDDS),Branded");
 
     try {
       const response = await fetch(url);
@@ -736,7 +728,7 @@ export default function Home() {
       setFdcResults(data.foods ?? []);
       setStatus(`Found ${(data.foods ?? []).length} USDA matches.`);
     } catch {
-      setStatus("USDA search failed. Check the API key and server internet access.");
+      setStatus("USDA search failed. Check FDC_API_KEY and server internet access.");
     }
   }
 
@@ -1114,10 +1106,6 @@ export default function Home() {
           <section className="grid gap-5 xl:grid-cols-[430px_1fr]">
             <Panel title="USDA Food Lookup">
               <div className="space-y-3">
-                <label className="field">
-                  <span>FoodData Central API key</span>
-                  <input value={fdcKey} onChange={(event) => setFdcKey(event.target.value)} placeholder="Saved locally in this browser" />
-                </label>
                 <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                   <label className="field">
                     <span>Search</span>
@@ -1128,7 +1116,7 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="text-sm leading-6 text-[#66705e]">
-                  USDA imports use reported nutrients and serving data where available. Branded items still depend
+                  USDA imports use a server-side FoodData Central key from FDC_API_KEY. Branded items still depend
                   on manufacturer data, so labels and weighed servings remain the best source for precision.
                 </p>
               </div>
