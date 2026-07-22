@@ -529,17 +529,34 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f4ef] text-[#20231f]">
-      <section className="border-b border-[#d7d2c4] bg-[#fbfaf7]">
+    <main className="min-h-screen bg-[#fff3f8] text-[#33212a]">
+      <section className="hero-band border-b border-[#f0bdd0] bg-[#fff8fb]">
+        <div className="fairy fairy-one" aria-hidden="true">
+          <span className="fairy-wing fairy-wing-left" />
+          <span className="fairy-wing fairy-wing-right" />
+          <span className="fairy-body" />
+          <span className="fairy-wand" />
+        </div>
+        <div className="fairy fairy-two" aria-hidden="true">
+          <span className="fairy-wing fairy-wing-left" />
+          <span className="fairy-wing fairy-wing-right" />
+          <span className="fairy-body" />
+          <span className="fairy-wand" />
+        </div>
+        <div className="petal-field" aria-hidden="true">
+          {Array.from({ length: 16 }, (_, index) => (
+            <span key={index} />
+          ))}
+        </div>
         <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#64745f]">
-              Local calorie dashboard
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#b94b79]">
+              Sakura calorie dashboard
             </p>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#17211a] md:text-5xl">
+            <h1 className="mt-3 text-4xl font-semibold leading-tight text-[#4a2032] md:text-5xl">
               Track meals and calculate a realistic weight-loss target.
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-[#5e6259]">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-[#7b5164]">
               Built for private self-hosting with local browser storage, Google Sheet CSV imports,
               and USDA FoodData Central lookup. The calculator recalculates energy needs as your
               projected weight changes.
@@ -624,12 +641,12 @@ export default function Home() {
               <div className="rounded-md border border-[#d9d2c2] bg-[#fffdf9] p-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-sm text-[#66705e]">Logged for selected day</p>
+                    <p className="text-sm text-[#8a5b6f]">Logged for selected day</p>
                     <p className="text-3xl font-semibold">{round(todayTotal)} kcal</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-[#66705e]">Goal remaining</p>
-                    <p className={remainingToday >= 0 ? "text-xl font-semibold text-[#356b43]" : "text-xl font-semibold text-[#a64031]"}>
+                    <p className="text-sm text-[#8a5b6f]">Goal remaining</p>
+                    <p className={remainingToday >= 0 ? "text-xl font-semibold text-[#a43a6b]" : "text-xl font-semibold text-[#9f3d49]"}>
                       {round(remainingToday)} kcal
                     </p>
                   </div>
@@ -692,7 +709,9 @@ export default function Home() {
                   const pointDate = formatProjectionDate(
                     addDaysIso(projectionStartDate, point.day),
                   );
-                  const tooltip = `${pointDate}. Week ${point.week.toFixed(1)}: ${point.weight.toFixed(1)} lb. Target ${round(point.targetCalories)} kcal/day. Maintenance ${round(point.maintenanceCalories)} kcal/day. Deficit ${round(point.deficit)} kcal/day.`;
+                  const twoPoundCalories =
+                    point.maintenanceCalories - (2 * CALORIES_PER_POUND) / 7;
+                  const tooltip = `${pointDate}. Week ${point.week.toFixed(1)}: ${point.weight.toFixed(1)} lb. Target ${round(point.targetCalories)} kcal/day. 2 lb/week estimate ${round(twoPoundCalories)} kcal/day. Maintenance ${round(point.maintenanceCalories)} kcal/day. Deficit ${round(point.deficit)} kcal/day.`;
                   const edgeClass =
                     left < 18
                       ? " projection-dot-left"
@@ -713,6 +732,7 @@ export default function Home() {
                         <span>Week {point.week.toFixed(1)}</span>
                         <span>{point.weight.toFixed(1)} lb projected</span>
                         <span>{round(point.targetCalories)} kcal/day target</span>
+                        <span>{round(twoPoundCalories)} kcal/day for 2 lb/week</span>
                         <span>{round(point.maintenanceCalories)} kcal/day maintenance</span>
                         <span>{round(point.deficit)} kcal/day deficit</span>
                       </span>
@@ -851,8 +871,8 @@ export default function Home() {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-md border border-[#d7d2c4] bg-[#fffdf9] p-4 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-[#253225]">{title}</h2>
+    <section className="panel-shell rounded-md border border-[#f0bdd0] bg-[#fffafd] p-4 shadow-sm">
+      <h2 className="mb-4 text-lg font-semibold text-[#5a263b]">{title}</h2>
       {children}
     </section>
   );
@@ -860,10 +880,10 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function Metric({ label, value, suffix }: { label: string; value: number; suffix: string }) {
   return (
-    <div className="rounded-md border border-[#d7d2c4] bg-white p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#697062]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#17211a]">{value}</p>
-      <p className="text-xs text-[#697062]">{suffix} / day</p>
+    <div className="metric-card rounded-md border border-[#f0bdd0] bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a85076]">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-[#4a2032]">{value}</p>
+      <p className="text-xs text-[#8a5b6f]">{suffix} / day</p>
     </div>
   );
 }
@@ -904,20 +924,20 @@ function Readout({
   tone?: "default" | "warning";
 }) {
   return (
-    <div className={tone === "warning" ? "readout-warning" : "rounded-md bg-[#f6f4ef] p-3"}>
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#697062]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#17211a]">{value}</p>
-      {note && <p className="mt-1 text-xs text-[#697062]">{note}</p>}
+    <div className={tone === "warning" ? "readout-warning" : "rounded-md bg-[#fff0f6] p-3"}>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a85076]">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-[#4a2032]">{value}</p>
+      {note && <p className="mt-1 text-xs text-[#8a5b6f]">{note}</p>}
     </div>
   );
 }
 
 function Milestone({ label, calories, deficit }: { label: string; calories: number; deficit: number }) {
   return (
-    <div className="rounded-md border border-[#e0dacb] p-3">
+    <div className="rounded-md border border-[#f1c4d4] bg-[#fffafd] p-3">
       <p className="font-semibold">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{round(calories)} kcal</p>
-      <p className="text-sm text-[#66705e]">{round(deficit)} kcal daily deficit</p>
+      <p className="text-sm text-[#8a5b6f]">{round(deficit)} kcal daily deficit</p>
     </div>
   );
 }
