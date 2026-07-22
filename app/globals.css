@@ -361,6 +361,32 @@ textarea {
   color: #4a2032;
 }
 
+.scenario-panel {
+  border: 1px solid #f1c4d4;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255, 255, 255, 0.9), transparent 8rem),
+    #fffafd;
+  padding: 0.95rem;
+}
+
+.scenario-panel .field {
+  align-self: start;
+}
+
+.scenario-panel h3 {
+  margin: 0 0 0.7rem;
+  color: #5a263b;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.scenario-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .result,
 .entry {
   display: grid;
@@ -437,6 +463,10 @@ table th {
 }
 
 @media (max-width: 720px) {
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
   .entry,
   .result {
     grid-template-columns: 1fr;

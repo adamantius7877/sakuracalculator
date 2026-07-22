@@ -20,6 +20,7 @@ type Profile = {
   activity: ActivityKey;
   goalWeightLb: number;
   goalWeeks: number;
+  plannedDailyCalories: number;
 };
 
 type Food = {
@@ -86,6 +87,7 @@ const defaultProfile: Profile = {
   activity: "light",
   goalWeightLb: 195,
   goalWeeks: 24,
+  plannedDailyCalories: 1800,
 };
 
 const starterFoods: Food[] = [
@@ -267,6 +269,84 @@ function caloriesForWeeklyLoss(profile: Profile, poundsPerWeek: number) {
   return caloriesForGoal(targetProfile).calories;
 }
 
+function projectTimelineForCalories(profile: Profile, dailyCalories: number) {
+  const target = Math.max(80, profile.goalWeightLb);
+  const startingWeight = profile.weightLb;
+  const maxDays = 3650;
+
+  if (!Number.isFinite(dailyCalories) || dailyCalories <= 0) {
+    return {
+      canReachGoal: false,
+      reason: "Enter daily calories to calculate a timeline.",
+      days: 0,
+      finalWeight: startingWeight,
+      averageWeeklyLoss: 0,
+    };
+  }
+
+  if (startingWeight <= target) {
+    return {
+      canReachGoal: true,
+      reason: "Goal already reached.",
+      days: 0,
+      finalWeight: startingWeight,
+      averageWeeklyLoss: 0,
+    };
+  }
+
+  let weight = startingWeight;
+  let previousWeight = weight;
+
+  for (let day = 1; day <= maxDays; day += 1) {
+    const tdee = estimateTdee(profile, weight);
+    const deficit = tdee - dailyCalories;
+    weight -= deficit / CALORIES_PER_POUND;
+
+    if (weight <= target) {
+      const lost = startingWeight - target;
+      return {
+        canReachGoal: true,
+        reason: "",
+        days: day,
+        finalWeight: weight,
+        averageWeeklyLoss: lost / (day / 7),
+      };
+    }
+
+    if (day % 30 === 0) {
+      const monthlyChange = previousWeight - weight;
+      previousWeight = weight;
+      if (monthlyChange < 0.05) {
+        break;
+      }
+    }
+  }
+
+  return {
+    canReachGoal: false,
+    reason:
+      "At this intake, the projection does not reach your goal within 10 years.",
+    days: maxDays,
+    finalWeight: weight,
+    averageWeeklyLoss: Math.max(0, (startingWeight - weight) / (maxDays / 7)),
+  };
+}
+
+function formatDuration(days: number) {
+  const wholeWeeks = Math.floor(days / 7);
+  const extraDays = days % 7;
+  const weekLabel = wholeWeeks === 1 ? "week" : "weeks";
+  const dayLabel = extraDays === 1 ? "day" : "days";
+  return `${wholeWeeks} ${weekLabel}, ${extraDays} ${dayLabel}`;
+}
+
+function formatWeekDay(days: number) {
+  if (days === 0) return "Today";
+  const week = Math.floor(days / 7) + 1;
+  const day = days % 7 || 7;
+  return `Day ${day} of week ${week}`;
+}
+
 function parseCsv(text: string) {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -399,19 +479,29 @@ export default function Home() {
     const bmr = estimateBmr(profile);
     const tdee = estimateTdee(profile);
     const goal = caloriesForGoal(profile);
+    const plannedTimeline = projectTimelineForCalories(
+      profile,
+      profile.plannedDailyCalories,
+    );
     return {
       bmr,
       tdee,
       maintain: tdee,
+      loseHalf: caloriesForWeeklyLoss(profile, 0.5),
       loseOne: caloriesForWeeklyLoss(profile, 1),
       loseOneHalf: caloriesForWeeklyLoss(profile, 1.5),
       loseTwo: caloriesForWeeklyLoss(profile, 2),
       goal,
+      plannedTimeline,
     };
   }, [profile]);
 
   const remainingToday = calculator.goal.calories - todayTotal;
   const projectedEndDate = addDaysIso(projectionStartDate, calculator.goal.days);
+  const plannedEndDate = addDaysIso(
+    projectionStartDate,
+    calculator.plannedTimeline.days,
+  );
   const goalMetricLabel = calculator.goal.isBelowRecommended
     ? "Goal floor"
     : "Goal pace";
@@ -687,7 +777,8 @@ export default function Home() {
                 It is separate from the fixed 1, 1.5, and 2 lb/week cards, and it recalculates expected
                 maintenance as your projected weight changes.
               </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Milestone label="0.5 lb per week" calories={calculator.loseHalf} deficit={calculator.tdee - calculator.loseHalf} />
                 <Milestone label="1 lb per week" calories={calculator.loseOne} deficit={calculator.tdee - calculator.loseOne} />
                 <Milestone label="1.5 lb per week" calories={calculator.loseOneHalf} deficit={calculator.tdee - calculator.loseOneHalf} />
                 <Milestone label="2 lb per week" calories={calculator.loseTwo} deficit={calculator.tdee - calculator.loseTwo} />
@@ -748,6 +839,45 @@ export default function Home() {
               </div>
             </Panel>
           </section>
+
+          <Panel title="Intake Timeline">
+            <div className="scenario-panel">
+              <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <NumberField
+                  label="Calories I eat per day"
+                  value={profile.plannedDailyCalories}
+                  onChange={(value) => updateProfile("plannedDailyCalories", value)}
+                />
+                <div>
+                  <h3>Timeline at that intake</h3>
+                  {calculator.plannedTimeline.canReachGoal ? (
+                    <div className="scenario-grid">
+                      <Readout
+                        label="Average loss"
+                        value={`${calculator.plannedTimeline.averageWeeklyLoss.toFixed(2)} lb/wk`}
+                        note="Modeled over the full projection"
+                      />
+                      <Readout
+                        label="Time to goal"
+                        value={formatDuration(calculator.plannedTimeline.days)}
+                        note={formatWeekDay(calculator.plannedTimeline.days)}
+                      />
+                      <Readout
+                        label="End date"
+                        value={formatProjectionDate(plannedEndDate)}
+                        note={`${profile.goalWeightLb} lb goal`}
+                      />
+                    </div>
+                  ) : (
+                    <div className="warning">
+                      {calculator.plannedTimeline.reason} Estimated average loss is{" "}
+                      {calculator.plannedTimeline.averageWeeklyLoss.toFixed(2)} lb/week.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Panel>
 
           <section className="grid gap-5 xl:grid-cols-2">
             <Panel title="Food Library">
