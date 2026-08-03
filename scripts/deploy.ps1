@@ -1,5 +1,6 @@
 param(
-  [switch] $NoBuild
+  [switch] $NoBuild,
+  [int] $AppPort = 3000
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,37 @@ if (-not (Test-Path ".env")) {
   Write-Host "Created .env from .env.example. Edit POSTGRES_PASSWORD before deploying, then rerun this script."
   exit 1
 }
+
+function Set-EnvValue {
+  param(
+    [string] $Name,
+    [string] $Value
+  )
+
+  $lines = Get-Content ".env"
+  $updated = $false
+  $nextLines = $lines | ForEach-Object {
+    if ($_ -match "^$([regex]::Escape($Name))=") {
+      $updated = $true
+      "$Name=$Value"
+    } else {
+      $_
+    }
+  }
+
+  if (-not $updated) {
+    $nextLines += "$Name=$Value"
+  }
+
+  Set-Content ".env" -Value $nextLines -Encoding ASCII
+}
+
+if ($AppPort -le 0) {
+  throw "AppPort must be greater than 0."
+}
+
+Set-EnvValue -Name "APP_PORT" -Value ([string]$AppPort)
+Write-Host "CaloriesDashboard will bind host port $AppPort to container port 3000."
 
 $dbContainer = docker compose ps --status running -q db 2>$null
 if ($dbContainer) {
@@ -28,7 +60,7 @@ if (-not $NoBuild) {
 docker @composeArgs
 docker compose ps
 
-$port = "3000"
+$port = "$AppPort"
 Get-Content ".env" | ForEach-Object {
   if ($_ -match "^APP_PORT=(.+)$") {
     $port = $matches[1]

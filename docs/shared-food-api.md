@@ -27,7 +27,7 @@ The app receives:
 For tighter production access, set `ALLOWED_ORIGINS` in `.env` to a comma-separated list, such as:
 
 ```text
-ALLOWED_ORIGINS=http://localhost:3001,http://192.168.1.50:3001
+ALLOWED_ORIGINS=http://localhost:3007,http://192.168.1.50:3007
 ```
 
 ## Food Model
