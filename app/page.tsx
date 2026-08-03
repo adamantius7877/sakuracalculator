@@ -43,9 +43,18 @@ const sexOptions: Record<Sex, string> = {
 
 const foodTypeOptions: Record<FoodType, string> = {
   meal: "Meal",
+  "meal-non-grocery": "Meal - Non Grocery",
   restaurant: "Restaurant",
   drink: "Drink",
 };
+
+function normalizeFoodType(value: unknown): FoodType {
+  return value === "meal-non-grocery" ||
+    value === "restaurant" ||
+    value === "drink"
+    ? value
+    : "meal";
+}
 
 const activityLevels: Record<ActivityKey, { label: string; factor: number }> = {
   sedentary: { label: "Sedentary", factor: 1.2 },
@@ -155,8 +164,7 @@ function foodCaloriesPerServing(food: Food) {
 }
 
 function normalizeFood(food: Partial<Food>): Food {
-  const type: FoodType =
-    food.type === "restaurant" || food.type === "drink" ? food.type : "meal";
+  const type = normalizeFoodType(food.type);
 
   return {
     id: food.id || uid("f"),
@@ -481,11 +489,15 @@ function foodsFromCsv(text: string): Food[] {
     const name = row[nameIndex];
     if (!name || !Number.isFinite(calories) || calories <= 0) return [];
 
-    const type: FoodType = row[typeIndex]?.toLowerCase().includes("drink")
-      ? "drink"
-      : row[typeIndex]?.toLowerCase().includes("restaurant")
-        ? "restaurant"
-        : "meal";
+    const typeLabel = row[typeIndex]?.toLowerCase() ?? "";
+    const type: FoodType = typeLabel.includes("non grocery") ||
+      typeLabel.includes("non-grocery")
+      ? "meal-non-grocery"
+      : typeLabel.includes("drink")
+        ? "drink"
+        : typeLabel.includes("restaurant")
+          ? "restaurant"
+          : "meal";
 
     return [
       {

@@ -42,7 +42,7 @@ Required fields:
 
 Optional fields:
 
-- `type`: `meal`, `restaurant`, or `drink`. Defaults to `meal`.
+- `type`: `meal`, `meal-non-grocery`, `restaurant`, or `drink`. Defaults to `meal`.
 - `servings`: number of servings represented by the item.
 - `serving`: free text description of one serving, such as `1 cup` or `half a fajita`.
 - `ingredients`: free text list of ingredients.
@@ -90,11 +90,12 @@ Returns all food types.
 GET /api/foods?type=meal
 ```
 
-`MealsAndGroceryDashboard` should use this endpoint when displaying the shared meal library.
+`MealsAndGroceryDashboard` should use this endpoint when displaying the shared grocery meal library. It returns only `type = "meal"` items and intentionally excludes `type = "meal-non-grocery"` items.
 
 Valid filters are:
 
 - `meal`
+- `meal-non-grocery`
 - `restaurant`
 - `drink`
 
@@ -120,6 +121,8 @@ Content-Type: application/json
 
 If `type` is omitted, the API stores the item as `meal`. That means `MealsAndGroceryDashboard` can post meals without setting `type`, but setting it explicitly is clearer.
 
+Use `"type": "meal-non-grocery"` for meals that belong in CaloriesDashboard but should not appear in grocery-planning meal lists.
+
 The endpoint uses upsert behavior:
 
 - New `id`: creates the food.
@@ -139,6 +142,7 @@ Use this pattern in `MealsAndGroceryDashboard`:
 
 - Read meals with `GET /api/foods?type=meal`.
 - Add meals with `POST /api/foods` and either omit `type` or set `"type": "meal"`.
+- Treat `meal-non-grocery` as a CaloriesDashboard-only meal type and do not include it in grocery planning views.
 - Preserve stable ids for meals created by the grocery app so edits update the existing row.
 - Do not overwrite the entire `foods` table from the grocery app.
 - Use `DELETE /api/foods/{id}` only when the user explicitly removes a shared meal.

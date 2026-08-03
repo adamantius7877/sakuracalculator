@@ -8,7 +8,9 @@ function rowNumber(value: unknown) {
 }
 
 function foodType(value: unknown): FoodType {
-  return value === "restaurant" || value === "drink" ? value : "meal";
+  return value === "meal-non-grocery" || value === "restaurant" || value === "drink"
+    ? value
+    : "meal";
 }
 
 function foodFromRow(row: Record<string, unknown>): Food {
@@ -79,7 +81,10 @@ export async function GET(request: Request) {
 
   try {
     const result =
-      type === "meal" || type === "restaurant" || type === "drink"
+      type === "meal" ||
+      type === "meal-non-grocery" ||
+      type === "restaurant" ||
+      type === "drink"
         ? await pool.query(
             "select id, name, type, source, serving, servings, ingredients, calories, protein, carbs, fat from foods where type = $1 order by updated_at desc, name",
             [type],

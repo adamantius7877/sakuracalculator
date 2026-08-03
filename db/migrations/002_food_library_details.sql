@@ -16,4 +16,4 @@ alter table foods
 
 alter table foods
   add constraint foods_type_check
-  check (type in ('meal', 'restaurant', 'drink'));
+  check (type in ('meal', 'meal-non-grocery', 'restaurant', 'drink'));

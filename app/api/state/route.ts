@@ -18,7 +18,9 @@ function rowNumber(value: unknown) {
 }
 
 function foodType(value: unknown): FoodType {
-  return value === "restaurant" || value === "drink" ? value : "meal";
+  return value === "meal-non-grocery" || value === "restaurant" || value === "drink"
+    ? value
+    : "meal";
 }
 
 async function readState(): Promise<DashboardState | null> {

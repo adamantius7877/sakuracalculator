@@ -10,6 +10,7 @@ test("dashboard includes the core product surfaces", async () => {
   assert.match(page, /Active profile/);
   assert.match(page, /Body Profile/);
   assert.match(page, /Food Library/);
+  assert.match(page, /Meal - Non Grocery/);
   assert.match(page, /Total calories/);
   assert.match(page, /Ingredients/);
   assert.match(page, /USDA Food Lookup/);
@@ -21,11 +22,12 @@ test("dashboard includes the core product surfaces", async () => {
 });
 
 test("postgres persistence API and docker deployment files are present", async () => {
-  const [route, foodsRoute, migration, foodMigration, compose, dockerfile, sharedApiDoc] = await Promise.all([
+  const [route, foodsRoute, migration, foodMigration, nonGroceryMigration, compose, dockerfile, sharedApiDoc] = await Promise.all([
     readFile(new URL("../app/api/state/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/foods/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/migrations/001_init.sql", import.meta.url), "utf8"),
     readFile(new URL("../db/migrations/002_food_library_details.sql", import.meta.url), "utf8"),
+    readFile(new URL("../db/migrations/003_food_non_grocery_meals.sql", import.meta.url), "utf8"),
     readFile(new URL("../compose.yml", import.meta.url), "utf8"),
     readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
     readFile(new URL("../docs/shared-food-api.md", import.meta.url), "utf8"),
@@ -42,6 +44,7 @@ test("postgres persistence API and docker deployment files are present", async (
   assert.match(migration, /create table if not exists foods/);
   assert.match(foodMigration, /add column if not exists type/);
   assert.match(foodMigration, /foods_type_check/);
+  assert.match(nonGroceryMigration, /meal-non-grocery/);
   assert.match(compose, /postgres:16-alpine/);
   assert.match(compose, /DATABASE_URL/);
   assert.match(compose, /ALLOWED_ORIGINS/);
