@@ -42,6 +42,7 @@ if ($AppPort -le 0) {
 }
 
 Set-EnvValue -Name "APP_PORT" -Value ([string]$AppPort)
+$env:APP_PORT = [string]$AppPort
 Write-Host "CaloriesDashboard will bind host port $AppPort to container port 3000."
 
 $dbContainer = docker compose ps --status running -q db 2>$null
