@@ -21,6 +21,10 @@ type FdcFood = {
   foodNutrients?: { nutrientName: string; value: number; unitName: string }[];
 };
 
+type FoodSortKey = "name" | "type" | "calories" | "servings" | "serving" | "source";
+
+type SortDirection = "asc" | "desc";
+
 const STORAGE_KEY = "calorie-dashboard-v1";
 const CALORIES_PER_POUND = 3500;
 const MIN_RECOMMENDED_CALORIES: Record<Sex, number> = {
@@ -145,6 +149,10 @@ const starterFoods: Food[] = [
     fat: 46,
   },
 ];
+
+function foodCaloriesPerServing(food: Food) {
+  return food.servings && food.servings > 0 ? food.calories / food.servings : food.calories;
+}
 
 function normalizeFood(food: Partial<Food>): Food {
   const type: FoodType =
@@ -624,6 +632,10 @@ export default function Home() {
   const profileLog = log.filter((entry) => entry.profileId === activeUserProfile.id);
 
   const selectedFood = foods.find((food) => food.id === selectedFoodId) ?? foods[0];
+  const sortedFoods = useMemo(
+    () => [...foods].sort((a, b) => a.name.localeCompare(b.name)),
+    [foods],
+  );
   const todayTotal = log
     .filter(
       (entry) =>
@@ -811,7 +823,7 @@ export default function Home() {
         foodId: selectedFood.id,
         name: selectedFood.name,
         serving: selectedFood.serving || "1 serving",
-        calories: selectedFood.calories,
+        calories: foodCaloriesPerServing(selectedFood),
         quantity,
         date: entryDate,
       },
@@ -1025,9 +1037,9 @@ export default function Home() {
               <label className="field">
                 <span>Food</span>
                 <select value={selectedFoodId} onChange={(event) => setSelectedFoodId(event.target.value)}>
-                  {foods.map((food) => (
+                  {sortedFoods.map((food) => (
                     <option key={food.id} value={food.id}>
-                      {food.name} - {food.calories} kcal
+                      {food.name} - {round(foodCaloriesPerServing(food))} kcal/serving
                     </option>
                   ))}
                 </select>
@@ -1401,6 +1413,24 @@ function Milestone({ label, calories, deficit }: { label: string; calories: numb
   );
 }
 
+function foodSortValue(food: Food, key: FoodSortKey) {
+  switch (key) {
+    case "type":
+      return foodTypeOptions[food.type];
+    case "calories":
+      return food.calories;
+    case "servings":
+      return food.servings ?? 0;
+    case "serving":
+      return food.serving ?? "";
+    case "source":
+      return food.source ?? "";
+    case "name":
+    default:
+      return food.name;
+  }
+}
+
 function FoodTable({
   foods,
   onEdit,
@@ -1410,23 +1440,80 @@ function FoodTable({
   onEdit: (food: Food) => void;
   onRemove: (food: Food) => void;
 }) {
+  const [sortKey, setSortKey] = useState<FoodSortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const sortedFoods = useMemo(
+    () =>
+      [...foods].sort((a, b) => {
+        const direction = sortDirection === "asc" ? 1 : -1;
+        const left = foodSortValue(a, sortKey);
+        const right = foodSortValue(b, sortKey);
+
+        if (typeof left === "number" && typeof right === "number") {
+          return (left - right) * direction;
+        }
+
+        return String(left).localeCompare(String(right)) * direction;
+      }),
+    [foods, sortDirection, sortKey],
+  );
+
+  function setSort(nextKey: FoodSortKey) {
+    if (nextKey === sortKey) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(nextKey);
+    setSortDirection("asc");
+  }
+
+  function sortLabel(key: FoodSortKey, label: string) {
+    const marker = sortKey === key ? (sortDirection === "asc" ? " up" : " down") : "";
+    return `${label}${marker}`;
+  }
+
   return (
     <div className="mt-4 max-h-72 overflow-auto rounded-md border border-[#e0dacb]">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
           <tr>
-            <th>Food</th>
-            <th>Type</th>
-            <th>Total calories</th>
-            <th>Servings</th>
-            <th>Serving</th>
-            <th>Source</th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("name")}>
+                {sortLabel("name", "Food")}
+              </button>
+            </th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("type")}>
+                {sortLabel("type", "Type")}
+              </button>
+            </th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("calories")}>
+                {sortLabel("calories", "Total calories")}
+              </button>
+            </th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("servings")}>
+                {sortLabel("servings", "Servings")}
+              </button>
+            </th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("serving")}>
+                {sortLabel("serving", "Serving")}
+              </button>
+            </th>
+            <th>
+              <button className="sort-button" type="button" onClick={() => setSort("source")}>
+                {sortLabel("source", "Source")}
+              </button>
+            </th>
             <th>Ingredients</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {foods.map((food) => (
+          {sortedFoods.map((food) => (
             <tr key={food.id}>
               <td>
                 <strong>{food.name}</strong>

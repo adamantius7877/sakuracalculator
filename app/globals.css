@@ -476,6 +476,18 @@ table th {
   text-transform: uppercase;
 }
 
+.sort-button {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.sort-button:hover {
+  color: #8f2c58;
+}
+
 .food-ingredients {
   max-width: 18rem;
   overflow-wrap: anywhere;
