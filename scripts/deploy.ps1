@@ -12,6 +12,14 @@ if (-not (Test-Path ".env")) {
   exit 1
 }
 
+$dbContainer = docker compose ps --status running -q db 2>$null
+if ($dbContainer) {
+  Write-Host "Creating a PostgreSQL backup before deployment..."
+  & (Join-Path $PSScriptRoot "backup-db.ps1")
+} else {
+  Write-Host "No running database container found. Skipping pre-deploy backup."
+}
+
 $composeArgs = @("compose", "up", "-d")
 if (-not $NoBuild) {
   $composeArgs += "--build"

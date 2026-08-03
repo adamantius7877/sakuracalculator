@@ -5,6 +5,7 @@ import type {
   ActivityKey,
   DashboardState,
   Food,
+  FoodType,
   LogEntry,
   Profile,
   Sex,
@@ -34,6 +35,12 @@ const sexOptions: Record<Sex, string> = {
   female: "Cis female",
   transFemale: "Trans woman",
   transMale: "Trans man",
+};
+
+const foodTypeOptions: Record<FoodType, string> = {
+  meal: "Meal",
+  restaurant: "Restaurant",
+  drink: "Drink",
 };
 
 const activityLevels: Record<ActivityKey, { label: string; factor: number }> = {
@@ -95,7 +102,7 @@ function normalizeDashboardState(saved: Partial<DashboardState> & { profile?: Pr
   return {
     profiles,
     activeProfileId,
-    foods: saved.foods?.length ? saved.foods : fallback.foods,
+    foods: saved.foods?.length ? saved.foods.map(normalizeFood) : fallback.foods,
     log,
   };
 }
@@ -104,8 +111,10 @@ const starterFoods: Food[] = [
   {
     id: "f-chicken-rice",
     name: "Chicken breast and rice bowl",
+    type: "meal",
     source: "Example",
     serving: "1 bowl",
+    servings: 1,
     calories: 520,
     protein: 48,
     carbs: 52,
@@ -114,8 +123,10 @@ const starterFoods: Food[] = [
   {
     id: "f-greek-yogurt",
     name: "Greek yogurt with berries",
+    type: "meal",
     source: "Example",
     serving: "1 cup",
+    servings: 1,
     calories: 210,
     protein: 22,
     carbs: 24,
@@ -124,14 +135,38 @@ const starterFoods: Food[] = [
   {
     id: "f-restaurant-burger",
     name: "Restaurant cheeseburger",
+    type: "restaurant",
     source: "Example",
     serving: "1 sandwich",
+    servings: 1,
     calories: 780,
     protein: 39,
     carbs: 48,
     fat: 46,
   },
 ];
+
+function normalizeFood(food: Partial<Food>): Food {
+  const type: FoodType =
+    food.type === "restaurant" || food.type === "drink" ? food.type : "meal";
+
+  return {
+    id: food.id || uid("f"),
+    name: food.name || "Food item",
+    type,
+    calories: Number(food.calories) || 0,
+    servings:
+      food.servings && Number(food.servings) > 0
+        ? Number(food.servings)
+        : undefined,
+    serving: food.serving || undefined,
+    ingredients: food.ingredients || undefined,
+    source: food.source || undefined,
+    protein: food.protein,
+    carbs: food.carbs,
+    fat: food.fat,
+  };
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -412,7 +447,7 @@ function parseCsv(text: string) {
   return rows;
 }
 
-function foodsFromCsv(text: string) {
+function foodsFromCsv(text: string): Food[] {
   const rows = parseCsv(text);
   if (rows.length === 0) return [];
 
@@ -421,8 +456,11 @@ function foodsFromCsv(text: string) {
     headers.findIndex((header) => names.some((name) => header.includes(name)));
 
   const nameIndex = indexOf("food", "item", "name", "restaurant");
+  const typeIndex = indexOf("type", "category");
   const caloriesIndex = indexOf("calorie", "kcal");
+  const servingsIndex = indexOf("servings", "number of servings", "serves");
   const servingIndex = indexOf("serving", "portion", "size");
+  const ingredientsIndex = indexOf("ingredient");
   const sourceIndex = indexOf("source", "restaurant", "brand");
   const proteinIndex = indexOf("protein");
   const carbsIndex = indexOf("carb");
@@ -435,13 +473,22 @@ function foodsFromCsv(text: string) {
     const name = row[nameIndex];
     if (!name || !Number.isFinite(calories) || calories <= 0) return [];
 
+    const type: FoodType = row[typeIndex]?.toLowerCase().includes("drink")
+      ? "drink"
+      : row[typeIndex]?.toLowerCase().includes("restaurant")
+        ? "restaurant"
+        : "meal";
+
     return [
       {
         id: uid("f"),
         name,
-        source: row[sourceIndex] || "Imported sheet",
-        serving: row[servingIndex] || "1 serving",
+        type,
         calories,
+        servings: Number(row[servingsIndex]) || undefined,
+        serving: row[servingIndex] || undefined,
+        ingredients: row[ingredientsIndex] || undefined,
+        source: row[sourceIndex] || "Imported sheet",
         protein: Number(row[proteinIndex]) || undefined,
         carbs: Number(row[carbsIndex]) || undefined,
         fat: Number(row[fatIndex]) || undefined,
@@ -472,10 +519,14 @@ export default function Home() {
   const [projectionStartDate] = useState(todayIso());
   const [newFood, setNewFood] = useState({
     name: "",
-    source: "Manual",
-    serving: "",
+    type: "meal" as FoodType,
     calories: "",
+    servings: "",
+    serving: "",
+    ingredients: "",
+    source: "Manual",
   });
+  const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
   const [csvText, setCsvText] = useState("");
   const [csvUrl, setCsvUrl] = useState("");
   const [fdcQuery, setFdcQuery] = useState("");
@@ -674,23 +725,81 @@ export default function Home() {
     setStatus(`${activeUserProfile.name} was removed.`);
   }
 
-  function addManualFood(event: FormEvent) {
+  function resetFoodForm() {
+    setNewFood({
+      name: "",
+      type: "meal",
+      calories: "",
+      servings: "",
+      serving: "",
+      ingredients: "",
+      source: "Manual",
+    });
+    setEditingFoodId(null);
+  }
+
+  function saveFood(event: FormEvent) {
     event.preventDefault();
     const calories = Number(newFood.calories);
-    if (!newFood.name || !newFood.serving || calories <= 0) return;
+    if (!newFood.name || calories <= 0) return;
 
     const food: Food = {
-      id: uid("f"),
-      name: newFood.name,
-      source: newFood.source || "Manual",
-      serving: newFood.serving,
+      id: editingFoodId ?? uid("f"),
+      name: newFood.name.trim(),
+      type: newFood.type,
       calories,
+      servings: Number(newFood.servings) > 0 ? Number(newFood.servings) : undefined,
+      serving: newFood.serving.trim() || undefined,
+      ingredients: newFood.ingredients.trim() || undefined,
+      source: newFood.source.trim() || undefined,
     };
 
-    setFoods((current) => [food, ...current]);
+    const wasEditing = Boolean(editingFoodId);
+    setFoods((current) =>
+      wasEditing
+        ? current.map((item) => (item.id === editingFoodId ? food : item))
+        : [food, ...current],
+    );
     setSelectedFoodId(food.id);
-    setNewFood({ name: "", source: "Manual", serving: "", calories: "" });
-    setStatus(`${food.name} was added to your food library.`);
+    resetFoodForm();
+    setStatus(`${food.name} was ${wasEditing ? "updated" : "added"} in your food library.`);
+  }
+
+  function editFood(food: Food) {
+    setEditingFoodId(food.id);
+    setNewFood({
+      name: food.name,
+      type: food.type,
+      calories: String(food.calories),
+      servings: food.servings ? String(food.servings) : "",
+      serving: food.serving ?? "",
+      ingredients: food.ingredients ?? "",
+      source: food.source ?? "",
+    });
+    setStatus(`Editing ${food.name}.`);
+  }
+
+  async function removeFood(food: Food) {
+    if (!window.confirm(`Remove ${food.name} from your food library?`)) return;
+
+    setFoods((current) => current.filter((item) => item.id !== food.id));
+    setLog((current) =>
+      current.map((entry) =>
+        entry.foodId === food.id ? { ...entry, foodId: undefined } : entry,
+      ),
+    );
+    if (selectedFoodId === food.id) {
+      setSelectedFoodId(foods.find((item) => item.id !== food.id)?.id ?? "");
+    }
+    if (editingFoodId === food.id) resetFoodForm();
+
+    try {
+      await fetch(`/api/foods/${encodeURIComponent(food.id)}`, { method: "DELETE" });
+    } catch {
+      // Local state will still remove the food when the database is unavailable.
+    }
+
+    setStatus(`${food.name} was removed from your food library.`);
   }
 
   function addLogEntry() {
@@ -701,7 +810,7 @@ export default function Home() {
         profileId: activeUserProfile.id,
         foodId: selectedFood.id,
         name: selectedFood.name,
-        serving: selectedFood.serving,
+        serving: selectedFood.serving || "1 serving",
         calories: selectedFood.calories,
         quantity,
         date: entryDate,
@@ -761,9 +870,11 @@ export default function Home() {
     const food: Food = {
       id: uid("f"),
       name: result.description.toLowerCase(),
-      source: result.brandOwner ? `USDA FDC - ${result.brandOwner}` : "USDA FoodData Central",
+      type: "meal",
       serving,
+      servings: 1,
       calories: round(nutrient(result, "energy")),
+      source: result.brandOwner ? `USDA FDC - ${result.brandOwner}` : "USDA FoodData Central",
       protein: nutrient(result, "protein") || undefined,
       carbs: nutrient(result, "carbohydrate") || undefined,
       fat: nutrient(result, "total lipid") || undefined,
@@ -1076,30 +1187,55 @@ export default function Home() {
             </div>
           </Panel>
 
-          <section className="grid gap-5 xl:grid-cols-2">
+          <section className="space-y-5">
             <Panel title="Food Library">
-              <form className="grid gap-3 md:grid-cols-4" onSubmit={addManualFood}>
+              <form className="grid gap-3 lg:grid-cols-6" onSubmit={saveFood}>
                 <label className="field md:col-span-2">
                   <span>Food name</span>
                   <input value={newFood.name} onChange={(event) => setNewFood((current) => ({ ...current, name: event.target.value }))} placeholder="Homemade chili" />
                 </label>
                 <label className="field">
-                  <span>Serving</span>
-                  <input value={newFood.serving} onChange={(event) => setNewFood((current) => ({ ...current, serving: event.target.value }))} placeholder="1 bowl" />
+                  <span>Type</span>
+                  <select value={newFood.type} onChange={(event) => setNewFood((current) => ({ ...current, type: event.target.value as FoodType }))}>
+                    {Object.entries(foodTypeOptions).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="field">
-                  <span>Calories</span>
+                  <span>Total calories</span>
                   <input value={newFood.calories} type="number" onChange={(event) => setNewFood((current) => ({ ...current, calories: event.target.value }))} placeholder="430" />
                 </label>
-                <label className="field md:col-span-3">
+                <label className="field">
+                  <span>Servings</span>
+                  <input value={newFood.servings} type="number" step="0.25" onChange={(event) => setNewFood((current) => ({ ...current, servings: event.target.value }))} placeholder="4" />
+                </label>
+                <label className="field">
+                  <span>Serving is</span>
+                  <input value={newFood.serving} onChange={(event) => setNewFood((current) => ({ ...current, serving: event.target.value }))} placeholder="1 cup, half a fajita" />
+                </label>
+                <label className="field lg:col-span-3">
                   <span>Source</span>
                   <input value={newFood.source} onChange={(event) => setNewFood((current) => ({ ...current, source: event.target.value }))} placeholder="Recipe, restaurant, label" />
                 </label>
-                <button className="primary self-end" type="submit">
-                  Save food
-                </button>
+                <label className="field lg:col-span-3">
+                  <span>Ingredients</span>
+                  <textarea value={newFood.ingredients} onChange={(event) => setNewFood((current) => ({ ...current, ingredients: event.target.value }))} placeholder="Chicken breast, rice, salsa, cheese" />
+                </label>
+                <div className="flex flex-wrap items-end gap-2 lg:col-span-6">
+                  <button className="primary" type="submit">
+                    {editingFoodId ? "Update food" : "Save food"}
+                  </button>
+                  {editingFoodId && (
+                    <button className="secondary" type="button" onClick={resetFoodForm}>
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
               </form>
-              <FoodTable foods={foods} />
+              <FoodTable foods={foods} onEdit={editFood} onRemove={removeFood} />
             </Panel>
 
             <Panel title="Import">
@@ -1265,25 +1401,52 @@ function Milestone({ label, calories, deficit }: { label: string; calories: numb
   );
 }
 
-function FoodTable({ foods }: { foods: Food[] }) {
+function FoodTable({
+  foods,
+  onEdit,
+  onRemove,
+}: {
+  foods: Food[];
+  onEdit: (food: Food) => void;
+  onRemove: (food: Food) => void;
+}) {
   return (
     <div className="mt-4 max-h-72 overflow-auto rounded-md border border-[#e0dacb]">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
           <tr>
             <th>Food</th>
+            <th>Type</th>
+            <th>Total calories</th>
+            <th>Servings</th>
             <th>Serving</th>
-            <th>Calories</th>
             <th>Source</th>
+            <th>Ingredients</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {foods.map((food) => (
             <tr key={food.id}>
-              <td>{food.name}</td>
-              <td>{food.serving}</td>
+              <td>
+                <strong>{food.name}</strong>
+              </td>
+              <td>{foodTypeOptions[food.type]}</td>
               <td>{food.calories}</td>
-              <td>{food.source}</td>
+              <td>{food.servings ?? "-"}</td>
+              <td>{food.serving ?? "-"}</td>
+              <td>{food.source ?? "-"}</td>
+              <td className="food-ingredients">{food.ingredients ?? "-"}</td>
+              <td>
+                <div className="table-actions">
+                  <button className="secondary" type="button" onClick={() => onEdit(food)}>
+                    Edit
+                  </button>
+                  <button className="danger" type="button" onClick={() => onRemove(food)}>
+                    Remove
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

@@ -1,5 +1,5 @@
 import { getPool, hasDatabaseUrl } from "@/lib/server/db";
-import type { DashboardState, Food, LogEntry, UserProfile } from "@/lib/types";
+import type { DashboardState, Food, FoodType, LogEntry, UserProfile } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -17,6 +17,10 @@ function rowNumber(value: unknown) {
   return typeof value === "number" ? value : Number(value ?? 0);
 }
 
+function foodType(value: unknown): FoodType {
+  return value === "restaurant" || value === "drink" ? value : "meal";
+}
+
 async function readState(): Promise<DashboardState | null> {
   const pool = getPool();
   const client = await pool.connect();
@@ -29,7 +33,7 @@ async function readState(): Promise<DashboardState | null> {
           "select id, name, profile from user_profiles order by created_at, name",
         ),
         client.query(
-          "select id, name, source, serving, calories, protein, carbs, fat from foods order by created_at desc, name",
+          "select id, name, type, source, serving, servings, ingredients, calories, protein, carbs, fat from foods order by created_at desc, name",
         ),
         client.query(
           "select id, profile_id, food_id, name, serving, quantity, calories, entry_date from log_entries order by entry_date desc, created_at desc",
@@ -56,9 +60,12 @@ async function readState(): Promise<DashboardState | null> {
       foods: foodsResult.rows.map((row) => ({
         id: row.id,
         name: row.name,
-        source: row.source,
-        serving: row.serving,
+        type: foodType(row.type),
         calories: rowNumber(row.calories),
+        servings: row.servings == null ? undefined : rowNumber(row.servings),
+        serving: row.serving ?? undefined,
+        ingredients: row.ingredients ?? undefined,
+        source: row.source ?? undefined,
         protein: row.protein == null ? undefined : rowNumber(row.protein),
         carbs: row.carbs == null ? undefined : rowNumber(row.carbs),
         fat: row.fat == null ? undefined : rowNumber(row.fat),
@@ -99,7 +106,9 @@ function cleanProfiles(profiles: UserProfile[]) {
 }
 
 function cleanFoods(foods: Food[]) {
-  return foods.filter((food) => food.id && food.name && food.serving && food.calories > 0);
+  return foods
+    .filter((food) => food.id && food.name && food.calories > 0)
+    .map((food) => ({ ...food, type: foodType(food.type) }));
 }
 
 function cleanLog(log: LogEntry[], profileIds: Set<string>) {
@@ -137,7 +146,6 @@ export async function PUT(request: Request) {
     try {
       await client.query("begin");
       await client.query("delete from log_entries");
-      await client.query("delete from foods");
       await client.query("delete from user_profiles");
 
       for (const profile of profiles) {
@@ -149,12 +157,29 @@ export async function PUT(request: Request) {
 
       for (const food of foods) {
         await client.query(
-          "insert into foods (id, name, source, serving, calories, protein, carbs, fat) values ($1, $2, $3, $4, $5, $6, $7, $8)",
+          `insert into foods
+             (id, name, type, source, serving, servings, ingredients, calories, protein, carbs, fat, updated_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+           on conflict (id)
+           do update set name = excluded.name,
+                         type = excluded.type,
+                         source = excluded.source,
+                         serving = excluded.serving,
+                         servings = excluded.servings,
+                         ingredients = excluded.ingredients,
+                         calories = excluded.calories,
+                         protein = excluded.protein,
+                         carbs = excluded.carbs,
+                         fat = excluded.fat,
+                         updated_at = now()`,
           [
             food.id,
             food.name,
-            food.source,
-            food.serving,
+            food.type,
+            food.source ?? null,
+            food.serving ?? null,
+            food.servings ?? null,
+            food.ingredients ?? null,
             food.calories,
             food.protein ?? null,
             food.carbs ?? null,

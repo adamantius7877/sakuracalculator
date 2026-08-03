@@ -476,6 +476,23 @@ table th {
   text-transform: uppercase;
 }
 
+.food-ingredients {
+  max-width: 18rem;
+  overflow-wrap: anywhere;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.table-actions .secondary,
+.table-actions .danger {
+  min-height: 2.1rem;
+  padding: 0.45rem 0.6rem;
+}
+
 @media (max-width: 720px) {
   .scenario-grid {
     grid-template-columns: 1fr;

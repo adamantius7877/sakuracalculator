@@ -26,12 +26,17 @@ export type UserProfile = {
   profile: Profile;
 };
 
+export type FoodType = "meal" | "restaurant" | "drink";
+
 export type Food = {
   id: string;
   name: string;
-  source: string;
-  serving: string;
+  type: FoodType;
   calories: number;
+  servings?: number;
+  serving?: string;
+  ingredients?: string;
+  source?: string;
   protein?: number;
   carbs?: number;
   fat?: number;

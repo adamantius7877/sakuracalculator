@@ -27,7 +27,7 @@ try {
     )
   `);
 
-  const migrations = ["001_init.sql"];
+  const migrations = ["001_init.sql", "002_food_library_details.sql"];
 
   for (const migration of migrations) {
     const version = migration.replace(/\.sql$/, "");
