@@ -897,6 +897,58 @@ export default function Home() {
     setStatus(`${food.name} was imported from USDA FoodData Central.`);
   }
 
+  const foodLibraryPanel = (
+    <Panel title="Food Library">
+      <form className="grid gap-3 lg:grid-cols-6" onSubmit={saveFood}>
+        <label className="field md:col-span-2">
+          <span>Food name</span>
+          <input value={newFood.name} onChange={(event) => setNewFood((current) => ({ ...current, name: event.target.value }))} placeholder="Homemade chili" />
+        </label>
+        <label className="field">
+          <span>Type</span>
+          <select value={newFood.type} onChange={(event) => setNewFood((current) => ({ ...current, type: event.target.value as FoodType }))}>
+            {Object.entries(foodTypeOptions).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Total calories</span>
+          <input value={newFood.calories} type="number" onChange={(event) => setNewFood((current) => ({ ...current, calories: event.target.value }))} placeholder="430" />
+        </label>
+        <label className="field">
+          <span>Servings</span>
+          <input value={newFood.servings} type="number" step="0.25" onChange={(event) => setNewFood((current) => ({ ...current, servings: event.target.value }))} placeholder="4" />
+        </label>
+        <label className="field">
+          <span>Serving is</span>
+          <input value={newFood.serving} onChange={(event) => setNewFood((current) => ({ ...current, serving: event.target.value }))} placeholder="1 cup, half a fajita" />
+        </label>
+        <label className="field lg:col-span-3">
+          <span>Source</span>
+          <input value={newFood.source} onChange={(event) => setNewFood((current) => ({ ...current, source: event.target.value }))} placeholder="Recipe, restaurant, label" />
+        </label>
+        <label className="field lg:col-span-3">
+          <span>Ingredients</span>
+          <textarea value={newFood.ingredients} onChange={(event) => setNewFood((current) => ({ ...current, ingredients: event.target.value }))} placeholder="Chicken breast, rice, salsa, cheese" />
+        </label>
+        <div className="flex flex-wrap items-end gap-2 lg:col-span-6">
+          <button className="primary" type="submit">
+            {editingFoodId ? "Update food" : "Save food"}
+          </button>
+          {editingFoodId && (
+            <button className="secondary" type="button" onClick={resetFoodForm}>
+              Cancel edit
+            </button>
+          )}
+        </div>
+      </form>
+      <FoodTable foods={foods} onEdit={editFood} onRemove={removeFood} />
+    </Panel>
+  );
+
   return (
     <main className="min-h-screen bg-[#fff3f8] text-[#33212a]">
       <section className="hero-band border-b border-[#f0bdd0] bg-[#fff8fb]">
@@ -1200,56 +1252,6 @@ export default function Home() {
           </Panel>
 
           <section className="space-y-5">
-            <Panel title="Food Library">
-              <form className="grid gap-3 lg:grid-cols-6" onSubmit={saveFood}>
-                <label className="field md:col-span-2">
-                  <span>Food name</span>
-                  <input value={newFood.name} onChange={(event) => setNewFood((current) => ({ ...current, name: event.target.value }))} placeholder="Homemade chili" />
-                </label>
-                <label className="field">
-                  <span>Type</span>
-                  <select value={newFood.type} onChange={(event) => setNewFood((current) => ({ ...current, type: event.target.value as FoodType }))}>
-                    {Object.entries(foodTypeOptions).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Total calories</span>
-                  <input value={newFood.calories} type="number" onChange={(event) => setNewFood((current) => ({ ...current, calories: event.target.value }))} placeholder="430" />
-                </label>
-                <label className="field">
-                  <span>Servings</span>
-                  <input value={newFood.servings} type="number" step="0.25" onChange={(event) => setNewFood((current) => ({ ...current, servings: event.target.value }))} placeholder="4" />
-                </label>
-                <label className="field">
-                  <span>Serving is</span>
-                  <input value={newFood.serving} onChange={(event) => setNewFood((current) => ({ ...current, serving: event.target.value }))} placeholder="1 cup, half a fajita" />
-                </label>
-                <label className="field lg:col-span-3">
-                  <span>Source</span>
-                  <input value={newFood.source} onChange={(event) => setNewFood((current) => ({ ...current, source: event.target.value }))} placeholder="Recipe, restaurant, label" />
-                </label>
-                <label className="field lg:col-span-3">
-                  <span>Ingredients</span>
-                  <textarea value={newFood.ingredients} onChange={(event) => setNewFood((current) => ({ ...current, ingredients: event.target.value }))} placeholder="Chicken breast, rice, salsa, cheese" />
-                </label>
-                <div className="flex flex-wrap items-end gap-2 lg:col-span-6">
-                  <button className="primary" type="submit">
-                    {editingFoodId ? "Update food" : "Save food"}
-                  </button>
-                  {editingFoodId && (
-                    <button className="secondary" type="button" onClick={resetFoodForm}>
-                      Cancel edit
-                    </button>
-                  )}
-                </div>
-              </form>
-              <FoodTable foods={foods} onEdit={editFood} onRemove={removeFood} />
-            </Panel>
-
             <Panel title="Import">
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -1333,6 +1335,10 @@ export default function Home() {
             </div>
           </Panel>
         </div>
+
+        <section className="lg:col-span-2">
+          {foodLibraryPanel}
+        </section>
       </section>
 
       {status && <div className="status">{status}</div>}
@@ -1474,8 +1480,8 @@ function FoodTable({
   }
 
   return (
-    <div className="mt-4 max-h-72 overflow-auto rounded-md border border-[#e0dacb]">
-      <table className="w-full border-collapse text-left text-sm">
+    <div className="mt-4 max-h-[34rem] overflow-auto rounded-md border border-[#e0dacb]">
+      <table className="w-full border-collapse text-left text-base">
         <thead>
           <tr>
             <th>
