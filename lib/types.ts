@@ -26,7 +26,7 @@ export type UserProfile = {
   profile: Profile;
 };
 
-export type FoodType = "meal" | "meal-non-grocery" | "restaurant" | "drink";
+export type FoodType = "meal" | "meal-non-grocery" | "restaurant" | "drink" | "side";
 
 export type Food = {
   id: string;

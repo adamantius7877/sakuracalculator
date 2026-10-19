@@ -31,6 +31,7 @@ try {
     "001_init.sql",
     "002_food_library_details.sql",
     "003_food_non_grocery_meals.sql",
+    "004_food_sides.sql",
   ];
 
   for (const migration of migrations) {

@@ -42,7 +42,7 @@ Required fields:
 
 Optional fields:
 
-- `type`: `meal`, `meal-non-grocery`, `restaurant`, or `drink`. Defaults to `meal`.
+- `type`: `meal`, `meal-non-grocery`, `restaurant`, `drink`, or `side`. Defaults to `meal`.
 - `servings`: number of servings represented by the item.
 - `serving`: free text description of one serving, such as `1 cup` or `half a fajita`.
 - `ingredients`: free text list of ingredients.
@@ -96,8 +96,28 @@ Valid filters are:
 
 - `meal`
 - `meal-non-grocery`
+- `side`
 - `restaurant`
 - `drink`
+
+### Shared Sides
+
+`GET /api/foods?type=side` returns only sides. The response also includes
+`supportedTypes`, containing `side` on servers that support it. Mealplanner checks
+this capability before uploading a side to avoid older servers classifying it as a meal.
+
+Save a side with `POST /api/foods` using `type: "side"` and the same calorie,
+servings, serving description, and ingredient fields as a meal. Sides appear as
+**Side** in the CaloriesDashboard food library and can be logged individually.
+The meal filter intentionally excludes sides.
+
+Mealplanner keeps side attachments and their snapshots in its own SQLite database.
+Changes to a shared side do not rewrite side details already attached to a list.
+
+Deploy CaloriesDashboard before the Mealplanner sides update. Migration
+`004_food_sides.sql` expands the existing type constraint without rewriting any foods,
+meal logs, profiles, or settings. The existing deploy script backs up the running
+PostgreSQL database before rebuilding. Both apps' persistent volumes must be retained.
 
 ### Add Or Update A Food
 

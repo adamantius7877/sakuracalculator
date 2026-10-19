@@ -44,12 +44,14 @@ const sexOptions: Record<Sex, string> = {
 const foodTypeOptions: Record<FoodType, string> = {
   meal: "Meal",
   "meal-non-grocery": "Meal - Non Grocery",
+  side: "Side",
   restaurant: "Restaurant",
   drink: "Drink",
 };
 
 function normalizeFoodType(value: unknown): FoodType {
   return value === "meal-non-grocery" ||
+    value === "side" ||
     value === "restaurant" ||
     value === "drink"
     ? value
@@ -493,11 +495,13 @@ function foodsFromCsv(text: string): Food[] {
     const type: FoodType = typeLabel.includes("non grocery") ||
       typeLabel.includes("non-grocery")
       ? "meal-non-grocery"
-      : typeLabel.includes("drink")
-        ? "drink"
-        : typeLabel.includes("restaurant")
-          ? "restaurant"
-          : "meal";
+      : typeLabel.includes("side")
+        ? "side"
+        : typeLabel.includes("drink")
+          ? "drink"
+          : typeLabel.includes("restaurant")
+            ? "restaurant"
+            : "meal";
 
     return [
       {

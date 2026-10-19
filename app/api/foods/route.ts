@@ -8,7 +8,7 @@ function rowNumber(value: unknown) {
 }
 
 function foodType(value: unknown): FoodType {
-  return value === "meal-non-grocery" || value === "restaurant" || value === "drink"
+  return value === "meal-non-grocery" || value === "restaurant" || value === "drink" || value === "side"
     ? value
     : "meal";
 }
@@ -83,6 +83,7 @@ export async function GET(request: Request) {
     const result =
       type === "meal" ||
       type === "meal-non-grocery" ||
+      type === "side" ||
       type === "restaurant" ||
       type === "drink"
         ? await pool.query(
@@ -93,7 +94,11 @@ export async function GET(request: Request) {
             "select id, name, type, source, serving, servings, ingredients, calories, protein, carbs, fat from foods order by updated_at desc, name",
           );
 
-    return json(request, { configured: true, foods: result.rows.map(foodFromRow) });
+    return json(request, {
+      configured: true,
+      supportedTypes: ["meal", "meal-non-grocery", "restaurant", "drink", "side"],
+      foods: result.rows.map(foodFromRow),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Food library read failed.";
     return json(request, { error: message }, { status: 500 });
